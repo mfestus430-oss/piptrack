@@ -17,7 +17,7 @@ import urllib.parse
 
 from flask import Blueprint, jsonify, request
 
-from ai import gemini_key, gemini_model, gemini_call, telegram_config, load_config, save_config
+from ai import gemini_key, gemini_model, gemini_call, telegram_config, discord_config, load_config, save_config
 from storage import kv_get, kv_set, query_db
 
 bp = Blueprint("live", __name__)
@@ -194,8 +194,8 @@ def add_alert(atype, pair, title, body):
     })
     kv_set("alerts", alerts[:200])
     try:
-        from brain import maybe_telegram_alert
-        maybe_telegram_alert(atype, pair, title, body)
+        from brain import maybe_push_alert
+        maybe_push_alert(atype, pair, title, body)
     except Exception:
         pass
 
@@ -475,6 +475,9 @@ def live_state():
             "configured": bool(telegram_config()["token"] and telegram_config()["chat_id"]),
             "enabled": bool(telegram_config()["enabled"]),
             "chatId": (telegram_config()["chat_id"][:4] + "…" + telegram_config()["chat_id"][-3:]) if len(telegram_config()["chat_id"]) > 7 else (telegram_config()["chat_id"] or ""),
+        },
+        "discord": {
+            "configured": bool(discord_config()["webhook"]),
         },
         "prices": prices,
         "openPositions": open_positions,

@@ -14,7 +14,7 @@ import urllib.request
 from flask import Blueprint, jsonify, request
 
 import ai
-from ai import gemini_call, gemini_call_parts, save_config, telegram_config, send_telegram
+from ai import gemini_call, gemini_call_parts, save_config, telegram_config, send_telegram, discord_config, send_discord
 from storage import kv_get, kv_set
 
 bp = Blueprint("brain", __name__)
@@ -506,9 +506,30 @@ def telegram_test():
     return jsonify({"ok": False, "error": err or "Telegram not configured", "message": err or "Telegram not configured"})
 
 
-def maybe_telegram_alert(atype, pair, title, body):
-    t = telegram_config()
-    if not (t["token"] and t["chat_id"] and t["enabled"]):
-        return
+def maybe_push_alert(atype, pair, title, body):
+    """Forward an alert to Telegram (if configured) and/or Discord (if webhook set)."""
     icon = {"enter": "📈", "exit": "🛑", "info": "🔔"}.get(atype, "🔔")
-    send_telegram(f"{icon} {title}\n{body}\n({pair})")
+    text = f"{icon} {title}\n{body}\n({pair})"
+    t = telegram_config()
+    if t["token"] and t["chat_id"] and t["enabled"]:
+        send_telegram(text)
+    if discord_config()["webhook"]:
+        send_discord(text)
+
+
+@bp.route("/api/config/discord", methods=["POST"])
+def discord_route():
+    body = request.get_json(force=True) or {}
+    cfg = ai.load_config()
+    if "webhook" in body:
+        cfg["discord_webhook"] = str(body["webhook"]).strip()
+    save_config(cfg)
+    return jsonify({"ok": True, "configured": bool(discord_config()["webhook"])})
+
+
+@bp.route("/api/discord/test", methods=["POST"])
+def discord_test():
+    ok, err = send_discord("🔔 PipTrack test — Discord notifications are working. You'll get enter/exit alerts here.")
+    if ok:
+        return jsonify({"ok": True, "message": "Test message sent to Discord"})
+    return jsonify({"ok": False, "error": err or "Discord not configured", "message": err or "Discord not configured"})

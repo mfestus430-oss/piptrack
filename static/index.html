@@ -632,6 +632,24 @@
             </div>
           </div>
 
+          <div class="card">
+            <div class="card-head"><h3>🎮 Discord alerts (works right now — no bot needed)</h3></div>
+            <p class="hint" style="margin-top:0">Get enter/exit alerts on your phone even when the app is closed. Create a Discord server/channel (free), go to channel settings → <b>Integrations → Webhooks → New Webhook</b>, copy the URL, paste it here.</p>
+            <div class="form-grid">
+              <label class="field full">
+                <span>Webhook URL</span>
+                <input type="password" class="input" id="setDiscordWebhook" placeholder="https://discord.com/api/webhooks/…" autocomplete="off">
+              </label>
+            </div>
+            <div class="card-foot" style="justify-content:space-between;gap:10px;flex-wrap:wrap">
+              <span class="hint" id="discordStatus" style="margin:0">Not configured.</span>
+              <div style="display:flex;gap:8px">
+                <button class="btn ghost sm" id="btnDiscordTest">Test message</button>
+                <button class="btn primary sm" id="btnSaveDiscord">Save Discord</button>
+              </div>
+            </div>
+          </div>
+
           <div class="card span2">
             <div class="card-head"><h3>About PipTrack</h3></div>
             <p class="hint">PipTrack is a self-hosted forex trading journal. Your data lives in a local SQLite database

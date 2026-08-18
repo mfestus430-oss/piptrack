@@ -137,6 +137,30 @@ def _mock_response(prompt):
 
 # ---------------------------------------------------------------- telegram
 
+def discord_config():
+    cfg = load_config()
+    url = os.environ.get("DISCORD_WEBHOOK") or cfg.get("discord_webhook", "")
+    return {"webhook": str(url).strip()}
+
+
+def send_discord(text):
+    """Send a message to a Discord channel via webhook. Returns (ok, error)."""
+    w = discord_config()
+    if not w["webhook"]:
+        return False, "Discord webhook not configured"
+    body = json.dumps({"content": text[:1900]}).encode()
+    req = urllib.request.Request(w["webhook"], data=body,
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            r.read()
+        return True, None
+    except urllib.error.HTTPError as e:
+        return False, f"Discord HTTP {e.code}"
+    except Exception as e:
+        return False, str(e)
+
+
 def telegram_config():
     cfg = load_config()
     token = os.environ.get("TELEGRAM_TOKEN") or cfg.get("telegram_token", "")

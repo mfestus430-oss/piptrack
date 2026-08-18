@@ -1151,6 +1151,7 @@ function renderSettings() {
   $("#setLot").value = state.settings.defaultLot || 0.1;
   $("#setStrategy").value = state.settings.defaultStrategy || "";
   renderTelegramStatus();
+  renderDiscordStatus();
 }
 
 /* ============================ sidebar foot ============================ */
@@ -2442,6 +2443,33 @@ function bindSettingsEvents() {
       toast("Telegram test failed: " + e.message, "err");
     }
   });
+  $("#btnSaveDiscord").addEventListener("click", async () => {
+    const webhook = $("#setDiscordWebhook").value.trim();
+    await postJSON("/api/config/discord", { webhook });
+    $("#setDiscordWebhook").value = "";
+    toast("Discord settings saved");
+    refreshLive();
+    renderDiscordStatus();
+  });
+  $("#btnDiscordTest").addEventListener("click", async () => {
+    try {
+      const r = await postJSON("/api/discord/test", {});
+      if (r.ok) toast(r.message || "Test sent");
+      else toast("Discord test failed: " + (r.error || "not configured"), "err");
+    } catch (e) {
+      toast("Discord test failed: " + e.message, "err");
+    }
+  });
+}
+
+function renderDiscordStatus() {
+  const t = state.live.data ? state.live.data.discord : null;
+  const el = $("#discordStatus");
+  if (!el) return;
+  if (!t) { el.textContent = "Not configured."; return; }
+  el.innerHTML = t.configured
+    ? "✅ Alerts will be sent to your Discord channel"
+    : "Not configured yet — create a webhook in Discord channel settings → Integrations.";
 }
 
 function renderTelegramStatus() {

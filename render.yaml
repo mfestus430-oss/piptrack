@@ -1,0 +1,30 @@
+# PipTrack — Render Blueprint
+# Deploy: push to GitHub → Render → "New Blueprint" → connect repo.
+# Secrets (GEMINI_API_KEY, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID) are set in the Render dashboard,
+# never committed to git.
+
+databases:
+  - name: piptrack-db
+    plan: free
+
+services:
+  - type: web
+    name: piptrack
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn server:app --workers 1 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT"
+    healthCheckPath: /api/state
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: piptrack-db
+          property: connectionString
+      - key: GEMINI_API_KEY
+        sync: false          # set in Render dashboard
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: TELEGRAM_ENABLED
+        value: "1"

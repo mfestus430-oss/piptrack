@@ -1,0 +1,4 @@
+flask>=3.0
+gunicorn>=21.2
+psycopg2-binary>=2.9
+youtube-transcript-api>=1.0

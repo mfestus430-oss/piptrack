@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PipTrack — Forex Trading Journal</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ======================= SIDEBAR ======================= -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">PipTrack</div>
+        <div class="brand-sub">Forex Trading Journal</div>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav">
+      <button class="nav-item active" data-view="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-view="trades">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="8 7 17 7 17 16"/></svg>
+        <span>Trades</span>
+      </button>
+      <button class="nav-item" data-view="analytics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span>Analytics</span>
+      </button>
+      <button class="nav-item" data-view="goals">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        <span>Goals</span>
+      </button>
+      <button class="nav-item" data-view="journal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <span>Journal</span>
+      </button>
+      <button class="nav-item" data-view="coach">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/><path d="M9 2a10 10 0 0 1 6 0"/></svg>
+        <span>Coach</span>
+      </button>
+      <button class="nav-item" data-view="brain">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a3 3 0 0 0-3 3 3 3 0 0 0-1.5 5.6A3 3 0 0 0 9 17a3 3 0 0 0 3 1 3 3 0 0 0 3-1 3 3 0 0 0 1.5-5.4A3 3 0 0 0 15 6a3 3 0 0 0-3-3z"/><path d="M12 6v12"/><path d="M8.5 8.5h7"/><path d="M8.5 15.5h7"/></svg>
+        <span>Brain</span>
+      </button>
+      <button class="nav-item" data-view="live">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>Live</span>
+      </button>
+      <button class="nav-item" data-view="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-foot" id="sidebarFoot"></div>
+  </aside>
+
+  <!-- ======================= MAIN ======================= -->
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="pageTitle">Dashboard</h1>
+        <p id="pageSub" class="page-sub"></p>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn ghost bell-btn" id="btnBell" title="Live alerts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span>Alerts</span>
+          <span class="bell-badge hidden" id="bellBadge">0</span>
+        </button>
+        <button class="btn ghost" id="btnExport" title="Export data">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Export</span>
+        </button>
+        <button class="btn primary" id="btnAddTrade">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>New Trade</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="content">
+
+      <!-- ================= DASHBOARD ================= -->
+      <div class="view" id="view-dashboard">
+        <div id="dashEmpty"></div>
+        <div id="dashBody">
+          <div class="kpi-grid" id="kpiGrid"></div>
+          <div class="grid2">
+            <div class="card span2">
+              <div class="card-head">
+                <h3>Equity Curve</h3>
+                <span class="chip" id="eqChip"></span>
+              </div>
+              <div class="chart-wrap"><canvas id="equityChart"></canvas></div>
+            </div>
+            <div class="card">
+              <div class="card-head"><h3>Win / Loss</h3></div>
+              <div class="donut-row">
+                <div class="donut-wrap"><canvas id="donutChart"></canvas></div>
+                <div class="donut-legend" id="donutLegend"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head"><h3>Monthly P&amp;L</h3></div>
+              <div class="chart-wrap"><canvas id="monthlyChart"></canvas></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h3>Recent Trades</h3>
+              <button class="btn ghost sm" id="btnViewAll">View all</button>
+            </div>
+            <div class="table-wrap" id="recentTable"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= TRADES ================= -->
+      <div class="view hidden" id="view-trades">
+        <div class="card">
+          <div class="filters" id="filters">
+            <input type="search" id="fSearch" class="input" placeholder="Search pair, strategy, notes…">
+            <select id="fPair" class="input"><option value="">All pairs</option></select>
+            <select id="fDirection" class="input">
+              <option value="">Both directions</option>
+              <option value="long">Long</option>
+              <option value="short">Short</option>
+            </select>
+            <select id="fResult" class="input">
+              <option value="">Any result</option>
+              <option value="win">Wins</option>
+              <option value="loss">Losses</option>
+              <option value="be">Breakeven</option>
+            </select>
+            <select id="fStrategy" class="input"><option value="">All strategies</option></select>
+            <select id="fSession" class="input">
+              <option value="">All sessions</option>
+              <option value="Sydney">Sydney</option>
+              <option value="Tokyo">Tokyo</option>
+              <option value="London">London</option>
+              <option value="New York">New York</option>
+            </select>
+            <input type="date" id="fFrom" class="input" title="From date">
+            <input type="date" id="fTo" class="input" title="To date">
+            <button class="btn ghost sm" id="fReset">Reset</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h3><span id="tradesCount">0</span> trades</h3>
+            <div class="filter-summary" id="filterSummary"></div>
+          </div>
+          <div class="table-wrap" id="tradesTable"></div>
+        </div>
+      </div>
+
+      <!-- ================= ANALYTICS ================= -->
+      <div class="view hidden" id="view-analytics">
+        <div class="grid2">
+          <div class="card">
+            <div class="card-head"><h3>Performance by Pair</h3></div>
+            <div id="anaByPair" class="ana-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Performance by Strategy</h3></div>
+            <div id="anaByStrategy" class="ana-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>By Session</h3></div>
+            <div id="anaBySession" class="ana-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>By Day of Week</h3></div>
+            <div id="anaByDay" class="ana-list"></div>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="card span2">
+            <div class="card-head"><h3>By Hour of Day</h3></div>
+            <div class="chart-wrap"><canvas id="hourChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>P&amp;L Distribution</h3></div>
+            <div class="chart-wrap"><canvas id="histChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Win Rate by Month</h3></div>
+            <div class="chart-wrap"><canvas id="winrateChart"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Monthly Breakdown</h3></div>
+          <div class="table-wrap" id="monthlyTable"></div>
+        </div>
+      </div>
+
+      <!-- ================= GOALS ================= -->
+      <div class="view hidden" id="view-goals">
+        <div class="goals-grid" id="goalsGrid"></div>
+        <div class="card" id="goalsEmpty">
+          <div class="empty" id="goalsEmptyInner"></div>
+        </div>
+      </div>
+
+      <!-- ================= JOURNAL ================= -->
+      <div class="view hidden" id="view-journal">
+        <div class="card">
+          <div class="card-head">
+            <h3>Journal Notes</h3>
+            <button class="btn primary sm" id="btnAddNote">+ Add note</button>
+          </div>
+          <div id="notesList" class="notes-list"></div>
+        </div>
+      </div>
+
+      <!-- ================= STRATEGY COACH ================= -->
+      <div class="view hidden" id="view-coach">
+
+        <!-- one-time strategy setup -->
+        <div class="card" id="coachSetupCard">
+          <div class="card-head">
+            <h3>⚙️ Set up your strategy once</h3>
+            <span class="chip">takes a minute — then you're done</span>
+          </div>
+          <p class="hint" style="margin-top:0">Tell the coach your rules a single time. From then on it's just: drop screenshot → instant verdict → outcome tracked automatically.</p>
+          <div class="form-grid" style="margin-top:14px">
+            <label class="field">
+              <span>Strategy name</span>
+              <input type="text" class="input" id="cpName" placeholder="e.g. London breakout" list="strategyList">
+            </label>
+            <label class="field">
+              <span>Direction bias</span>
+              <select class="input" id="cpBias">
+                <option value="both">Both — no bias</option>
+                <option value="long">Long (buy) only</option>
+                <option value="short">Short (sell) only</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Allowed pairs (comma-separated — empty = any)</span>
+              <input type="text" class="input" id="cpPairs" placeholder="EUR/USD, GBP/USD, XAU/USD">
+            </label>
+            <label class="field">
+              <span>Allowed sessions</span>
+              <div class="sess-checks" id="cpSessions">
+                <label><input type="checkbox" value="Sydney"> Sydney</label>
+                <label><input type="checkbox" value="Tokyo"> Tokyo</label>
+                <label><input type="checkbox" value="London"> London</label>
+                <label><input type="checkbox" value="New York"> New York</label>
+              </div>
+            </label>
+            <label class="field">
+              <span>Minimum proven win rate (from your journal)</span>
+              <input type="number" class="input" id="cpMinWR" step="1" min="0" max="100" placeholder="45">
+            </label>
+            <label class="field">
+              <span>Strictness</span>
+              <select class="input" id="cpStrict">
+                <option value="relaxed">Relaxed — take more setups</option>
+                <option value="balanced" selected>Balanced</option>
+                <option value="strict">Strict — fewer, better setups</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Chart colors (for screenshot reading)</span>
+              <select class="input" id="cpTheme">
+                <option value="auto" selected>Auto-detect</option>
+                <option value="green-red">Green up / Red down</option>
+                <option value="blue-red">Blue up / Red down</option>
+                <option value="light-dark">White up / Black down</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Max risk per trade (% of balance)</span>
+              <input type="number" class="input" id="cpRiskPct" step="0.1" min="0" max="50" placeholder="1.5">
+            </label>
+          </div>
+          <div class="card-foot"><button class="btn primary" id="btnSaveProfile">Save my strategy — I'm done</button></div>
+        </div>
+
+        <!-- ready banner -->
+        <div class="card hidden" id="coachReadyBanner">
+          <div class="ready-line">
+            <div class="ready-text" id="readyText"></div>
+            <button class="btn ghost sm" id="btnEditProfile">Edit strategy</button>
+          </div>
+        </div>
+
+        <!-- analyze -->
+        <div class="card" id="coachAnalyzeCard">
+          <div class="card-head">
+            <h3>📸 Drop a chart screenshot</h3>
+            <span class="chip">instant verdict</span>
+          </div>
+          <div class="dropzone" id="dropzone">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <p><b>Drop your chart screenshot here</b> or <span class="link">browse files</span></p>
+            <p class="hint" style="margin-top:4px">Verdict appears instantly — nothing else to fill in. Handled locally, never uploaded.</p>
+            <input type="file" id="sigFile" accept="image/*" hidden>
+          </div>
+          <div class="sig-preview hidden" id="sigPreviewWrap">
+            <img id="sigPreview" alt="Chart preview">
+            <button class="icon-btn del" id="sigClear" title="Remove">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </div>
+          <div class="sig-bar">
+            <label>Pair
+              <select class="input" id="sigPair"></select>
+            </label>
+            <label>Direction
+              <select class="input" id="sigDir">
+                <option value="auto">Auto (chart)</option>
+                <option value="long">Long (buy)</option>
+                <option value="short">Short (sell)</option>
+              </select>
+            </label>
+            <label>Session
+              <select class="input" id="sigSession">
+                <option value="Sydney">Sydney</option>
+                <option value="Tokyo">Tokyo</option>
+                <option value="London">London</option>
+                <option value="New York">New York</option>
+              </select>
+            </label>
+            <label><span id="sigRiskLabel">Risk</span>
+              <input type="number" class="input" id="sigRisk" step="any" min="0">
+            </label>
+            <button class="btn primary" id="btnAnalyze" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <span>Read chart &amp; decide</span>
+            </button>
+          </div>
+          <p class="hint">Defaults are auto-filled from your strategy and remembered — change them anytime, it keeps your last choice.</p>
+        </div>
+
+        <!-- verdict -->
+        <div class="card hidden" id="coachResult">
+          <div class="verdict-grid">
+            <div class="gauge-wrap">
+              <canvas id="gaugeChart"></canvas>
+            </div>
+            <div class="verdict-side">
+              <div class="verdict-title" id="verdictTitle">—</div>
+              <div class="verdict-msg" id="verdictMsg"></div>
+              <div class="verdict-chips" id="edgeChips"></div>
+              <div class="verdict-actions">
+                <button class="btn primary" id="btnLogTrade">Log as trade</button>
+                <button class="btn ghost" id="btnReanalyze">Re-analyze</button>
+              </div>
+              <p class="hint" style="margin-top:10px">⚠️ Educational tool, not financial advice. The chart read is a pixel-level heuristic — always confirm on your platform before trading.</p>
+            </div>
+          </div>
+          <div class="rule-list" id="ruleList"></div>
+        </div>
+
+        <!-- pending decisions -->
+        <div class="card hidden" id="coachPendingCard">
+          <div class="card-head">
+            <h3>⏳ Pending decisions — your progress tracker</h3>
+            <span class="chip" id="pendingCount"></span>
+          </div>
+          <div id="pendingList"></div>
+        </div>
+
+        <!-- signal history -->
+        <div class="card">
+          <div class="card-head">
+            <h3>Signal history &amp; coach accuracy</h3>
+            <div class="sig-stats" id="sigStats"></div>
+          </div>
+          <div class="table-wrap" id="sigTable"></div>
+        </div>
+      </div>
+
+      <!-- ================= STRATEGY BRAIN ================= -->
+      <div class="view hidden" id="view-brain">
+        <div class="grid2">
+          <div class="card">
+            <div class="card-head">
+              <h3>🧠 Teach your strategy</h3>
+              <span class="chip" id="brainStatusChip">not learned</span>
+            </div>
+            <p class="hint" style="margin-top:0">Explain your strategy in your own words — or paste a YouTube video of it. The AI extracts your actual rules (entries, filters, exits) and stores them as your <b>Strategy Brain</b>, used by the Coach, Live monitor and backtest.</p>
+            <div class="form-grid">
+              <label class="field full">
+                <span>Explain your strategy (entries, filters, exits, risk)</span>
+                <textarea class="input" id="bText" rows="7" placeholder="e.g. I trade London session breakouts on EUR/USD. I wait for the first hour of London to form a range, then enter long when price breaks above the range high with a strong bullish candle. Only with the daily trend up. Stop below the range low, TP at 2x the range…"></textarea>
+              </label>
+              <label class="field full">
+                <span>…or paste a YouTube video link</span>
+                <input type="url" class="input" id="bYt" placeholder="https://www.youtube.com/watch?v=… (video transcript will be read)">
+              </label>
+              <label class="field full">
+                <span>…or teach with screenshots of your setups (up to 6 — mix text + screenshots freely)</span>
+                <input type="file" class="input" id="bImgs" accept="image/*" multiple>
+                <div class="img-previews" id="bImgPreviews"></div>
+              </label>
+            </div>
+            <div class="card-foot" style="justify-content:space-between">
+              <span class="hint" id="bTeachHint" style="margin:0">Uses your Gemini key (Settings).</span>
+              <button class="btn primary" id="btnTeach">
+                <span>Teach my strategy</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>🧬 Learned strategy</h3></div>
+            <div id="bLearned" class="learned-box">
+              <div class="empty" style="padding:22px"><p>Nothing learned yet — teach your strategy on the left.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>📊 Backtest — is your strategy valid?</h3>
+            <span class="chip" id="btChip">run on real historical data</span>
+          </div>
+          <p class="hint" style="margin-top:0">The learned rules are replayed bar-by-bar against real historical candles (Yahoo Finance). Results include win rate, profit factor, expectancy, drawdown and an equity curve — the same numbers that decide whether to keep trading it.</p>
+          <div class="backtest-controls">
+            <label class="field"><span>Pair</span>
+              <select class="input" id="btPair"></select>
+            </label>
+            <label class="field"><span>Timeframe</span>
+              <select class="input" id="btTf">
+                <option value="1h">1 hour</option>
+                <option value="1d">1 day</option>
+              </select>
+            </label>
+            <label class="field"><span>Period</span>
+              <select class="input" id="btMonths">
+                <option value="3">3 months</option>
+                <option value="6">6 months</option>
+                <option value="12" selected>12 months</option>
+                <option value="24">24 months</option>
+              </select>
+            </label>
+            <button class="btn primary" id="btnBacktest">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              <span>Run backtest</span>
+            </button>
+          </div>
+          <div id="btResult"></div>
+          <div id="btReportWrap">
+            <div class="card-foot" style="margin-top:14px">
+              <button class="btn primary" id="btnReport" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg>
+                <span>Get AI strategy report</span>
+              </button>
+            </div>
+            <div id="btReport"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= LIVE MONITOR ================= -->
+      <div class="view hidden" id="view-live">
+        <div class="card">
+          <div class="card-head">
+            <h3>⚡ Live market monitor</h3>
+            <div class="live-ctrl">
+              <span class="chip" id="liveStatusChip">off</span>
+              <button class="btn primary sm" id="btnLiveToggle">Turn on</button>
+            </div>
+          </div>
+          <p class="hint" style="margin-top:0">Real-time prices (60s refresh) with Gemini AI analysis every few minutes. You'll get <b>enter</b> alerts when a setup fires and <b>exit</b> alerts for your open positions — in-app toast, sound, and browser notification.</p>
+          <div class="live-config">
+            <label class="field"><span>Monitored pairs</span>
+              <input type="text" class="input" id="lvPairs" placeholder="EUR/USD, GBP/USD, XAU/USD">
+            </label>
+            <label class="field"><span>Price refresh (sec)</span>
+              <input type="number" class="input" id="lvPriceInt" min="15" max="3600" step="5">
+            </label>
+            <label class="field"><span>AI analysis every (sec)</span>
+              <input type="number" class="input" id="lvAiInt" min="30" max="3600" step="10">
+            </label>
+            <label class="field ai-toggle"><span>Gemini AI analysis</span>
+              <label class="switch"><input type="checkbox" id="lvAiOn"><span class="slider"></span></label>
+            </label>
+            <label class="field"><span>Gemini status</span>
+              <div class="gemini-status" id="lvGeminiStatus"></div>
+            </label>
+            <button class="btn ghost sm" id="btnTestAlert">🔔 Test notification</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Live prices &amp; AI verdicts</h3>
+            <span class="chip" id="lvFreshness"></span>
+          </div>
+          <div class="table-wrap" id="lvPrices"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Open positions — exit guidance</h3>
+            <span class="chip" id="lvPosCount"></span>
+          </div>
+          <div class="table-wrap" id="lvPositions"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>🧪 Paper trading</h3>
+            <div class="live-ctrl">
+              <span class="chip" id="ppChip">off</span>
+              <label class="switch" title="Auto-trade ENTER signals"><input type="checkbox" id="ppOn"><span class="slider"></span></label>
+            </div>
+          </div>
+          <p class="hint" style="margin-top:0">When ON, every <b>ENTER</b> alert automatically opens a simulated trade (entry = live price, SL/TP from your learned strategy's exit plan). Trades close on SL / TP / AI-exit — or tap close. See if the strategy really works without risking a cent.</p>
+          <div class="sig-stats" id="ppStats"></div>
+          <div class="lb-section" style="margin:12px 0 6px">Open paper trades</div>
+          <div class="table-wrap" id="ppOpen"></div>
+          <div class="lb-section" style="margin:14px 0 6px">Closed (recent)</div>
+          <div class="table-wrap" id="ppClosed"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>🔔 Alerts</h3>
+            <div class="live-ctrl">
+              <button class="btn ghost sm" id="btnMarkRead">Mark all read</button>
+            </div>
+          </div>
+          <div id="lvAlerts" class="alerts-feed"></div>
+        </div>
+      </div>
+
+      <!-- ================= SETTINGS ================= -->
+      <div class="view hidden" id="view-settings">
+        <div class="grid2">
+          <div class="card">
+            <div class="card-head"><h3>Account</h3></div>
+            <div class="form-grid">
+              <label class="field">
+                <span>Account currency</span>
+                <select id="setCurrency" class="input">
+                  <option value="USD">USD — US Dollar</option>
+                  <option value="EUR">EUR — Euro</option>
+                  <option value="GBP">GBP — British Pound</option>
+                  <option value="NGN">NGN — Naira</option>
+                  <option value="GHS">GHS — Ghana Cedi</option>
+                  <option value="ZAR">ZAR — Rand</option>
+                  <option value="JPY">JPY — Yen</option>
+                  <option value="AUD">AUD — Australian Dollar</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Account starting balance</span>
+                <input type="number" id="setBalance" class="input" step="any" min="0" placeholder="10000">
+              </label>
+              <label class="field">
+                <span>Default lot size (new trades)</span>
+                <input type="number" id="setLot" class="input" step="0.01" min="0.01" placeholder="0.10">
+              </label>
+              <label class="field">
+                <span>Default strategy (new trades)</span>
+                <input type="text" id="setStrategy" class="input" placeholder="e.g. Breakout" list="strategyList">
+              </label>
+            </div>
+            <div class="card-foot"><button class="btn primary" id="btnSaveSettings">Save settings</button></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>Data</h3></div>
+            <div class="data-actions">
+              <button class="btn ghost" id="btnExportJson">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export backup (JSON)
+              </button>
+              <button class="btn ghost" id="btnExportCsv">Export trades (CSV)</button>
+              <button class="btn ghost" id="btnImportJson">Import backup (JSON)</button>
+              <input type="file" id="importFile" accept=".json,application/json" hidden>
+              <button class="btn ghost" id="btnDemo">Load demo data</button>
+              <button class="btn danger" id="btnClear">Erase all data</button>
+            </div>
+            <p class="hint">Backups include trades, goals, journal notes and settings. The CSV export is a flat table of your trades, ready for Excel/Google Sheets.</p>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>🤖 Gemini AI &amp; notifications</h3></div>
+            <div class="form-grid">
+              <label class="field full">
+                <span>Gemini API key (Google AI Studio)</span>
+                <input type="password" class="input" id="setGeminiKey" placeholder="Paste your API key" autocomplete="off">
+              </label>
+              <label class="field full">
+                <span>Model</span>
+                <input type="text" class="input" id="setGeminiModel" placeholder="gemini-3.6-flash">
+              </label>
+            </div>
+            <div class="card-foot"><button class="btn primary" id="btnSaveGemini">Save API key</button></div>
+            <p class="hint">Your key is stored only in <code>data/config.json</code> on this machine — it is <b>not</b> included in backups and never sent anywhere except Google's Gemini API. ⚠️ If you've shared this key publicly, rotate it in Google AI Studio.</p>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>📲 Telegram alerts (off-the-chat notifications)</h3></div>
+            <p class="hint" style="margin-top:0">Get enter/exit alerts on your phone even when the app is closed. Create a bot in Telegram with <b>@BotFather</b> (send <code>/newbot</code>, copy the token), then message your bot once and copy the chat id from <b>@userinfobot</b>.</p>
+            <div class="form-grid">
+              <label class="field full">
+                <span>Bot token</span>
+                <input type="password" class="input" id="setTgToken" placeholder="123456789:AA…" autocomplete="off">
+              </label>
+              <label class="field">
+                <span>Chat ID</span>
+                <input type="text" class="input" id="setTgChat" placeholder="e.g. 987654321">
+              </label>
+              <label class="field">
+                <span>&nbsp;</span>
+                <label class="check-line"><input type="checkbox" id="setTgOn"> <b>Send alerts to Telegram</b></label>
+              </label>
+            </div>
+            <div class="card-foot" style="justify-content:space-between;gap:10px;flex-wrap:wrap">
+              <span class="hint" id="tgStatus" style="margin:0">Not configured.</span>
+              <div style="display:flex;gap:8px">
+                <button class="btn ghost sm" id="btnTgTest">Test message</button>
+                <button class="btn primary sm" id="btnSaveTg">Save Telegram</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card span2">
+            <div class="card-head"><h3>About PipTrack</h3></div>
+            <p class="hint">PipTrack is a self-hosted forex trading journal. Your data lives in a local SQLite database
+            (<code>data/piptrack.db</code>) — it never leaves your machine. Trades, analytics, equity curve, goals and
+            journal notes are all computed locally.</p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+</div>
+
+<!-- FAB -->
+<button class="fab" id="fabAdd" title="New trade">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
+
+<!-- Modal root -->
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal" id="modalBox"></div>
+</div>
+
+<!-- Toast root -->
+<div class="toast-root" id="toastRoot"></div>
+
+<datalist id="strategyList">
+  <option value="Breakout"></option>
+  <option value="Trend Pullback"></option>
+  <option value="Support / Resistance"></option>
+  <option value="News Reversal"></option>
+  <option value="Order Block"></option>
+  <option value="ICT / SMC"></option>
+  <option value="Scalping"></option>
+  <option value="Swing"></option>
+</datalist>
+
+<script src="/static/charts.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

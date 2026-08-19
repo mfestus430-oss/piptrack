@@ -159,7 +159,8 @@ PRESET_STRATEGY = {
         "exit": {"sl_pct": 1.5, "tp_pct": None, "atr_sl_mult": None, "atr_tp_mult": None,
                  "max_hold_bars": None, "trail_pct": 1.5},
         "notes": ["Trendlines fitted through last 3 swing pivots, validated by touch count",
-                  "Top-down filter uses the daily trend (SMA5/SMA20)"]
+                  "Top-down filter uses the daily trend (SMA5/SMA20)",
+                  "Stop loss 1.5% below entry; trailing stop 1.5% lets the trend run (no fixed TP)"]
     },
     "source": {"preset": True,
                "log": [{"type": "preset", "label": "Loaded default: Top-Down Trendline S/R (4H Heiken Ashi)", "date": time.strftime("%Y-%m-%d")}]},
@@ -258,6 +259,15 @@ def brain_teach():
     rules.setdefault("direction", "both")
     rules.setdefault("timeframe", "1h")
     rules.setdefault("name", "My strategy")
+
+    # safety net: never let a learned strategy end up with an empty exit plan
+    ex = rules.setdefault("exit", {})
+    if not any(ex.get(k) for k in ("sl_pct", "atr_sl_mult", "tp_pct", "atr_tp_mult", "trail_pct", "max_hold_bars")):
+        ex["sl_pct"] = 1.5
+        ex["trail_pct"] = 1.5
+        notes = rules.setdefault("notes", [])
+        if "Default exit applied: SL 1.5% + trailing stop 1.5% (no fixed TP)" not in notes:
+            notes.append("Default exit applied: SL 1.5% + trailing stop 1.5% (no fixed TP)")
 
     log = list(((existing or {}).get("source") or {}).get("log", []))
     now = time.strftime("%Y-%m-%d")

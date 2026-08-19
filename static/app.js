@@ -1980,7 +1980,10 @@ function renderBrain() {
     ${b.summary ? `<div class="lb-summary">${esc(b.summary)}</div>` : ""}
     <div class="lb-section" style="display:flex;justify-content:space-between;align-items:center">
       <span>Direction / timeframe</span>
-      <button class="btn primary sm" id="btnEditBrain">✏️ Edit entry &amp; exit rules</button>
+      <div style="display:flex;gap:6px">
+        <button class="btn ghost sm" id="btnRepairBrain">🔧 Fix strategy</button>
+        <button class="btn primary sm" id="btnEditBrain">✏️ Edit entry &amp; exit rules</button>
+      </div>
     </div>
     <div class="cond-chips">
       <span class="cond-chip"><b>${esc((r.direction || "both").toUpperCase())}</b></span>
@@ -2001,6 +2004,18 @@ function renderBrain() {
     <div class="lb-note" style="margin-top:6px">Add more videos, text or screenshots above — it merges into this strategy.</div>`;
   const editBtn = $("#btnEditBrain");
   if (editBtn) editBtn.addEventListener("click", openBrainEditor);
+  const repBtn = $("#btnRepairBrain");
+  if (repBtn) repBtn.addEventListener("click", async () => {
+    try {
+      const res = await postJSON("/api/strategy/brain/repair", {});
+      if (!res.ok) throw new Error(res.error || "Repair failed");
+      state.brain = res.brain;
+      renderBrain();
+      const n = (res.changes || []).length;
+      if (n) toast("🔧 Fixed " + n + " rule issue" + (n > 1 ? "s" : "") + " — run the backtest now");
+      else toast("Strategy looks clean — no fixes needed");
+    } catch (err) { toast("Repair failed: " + err.message, "err"); }
+  });
 }
 
 let teachImgs = []; /* [{mime_type, data}] after client-side resize */
@@ -2119,8 +2134,10 @@ function renderBacktestResult(res) {
     </tr>`).join("");
 
   const untestable = res.untestable || [];
+  const repaired = res.repaired || [];
   $("#btResult").innerHTML = `
     <div class="bt-verdict ${cls}">${esc(s.verdict)} — ${esc(res.pair)} · ${res.timeframe} · ${res.months}mo · ${res.bars} bars tested${res.heikenAshi ? " · Heiken Ashi" : ""}</div>
+    ${repaired.length ? `<div class="hint" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:9px;padding:8px 12px;margin-bottom:8px">🔧 Auto-repaired ${repaired.length} rule issue(s): <b>${esc(repaired.slice(0, 4).join(" · "))}</b>${repaired.length > 4 ? " …" : ""}</div>` : ""}
     ${untestable.length ? `<div class="hint" style="background:var(--red-soft);border:1px solid rgba(239,68,68,.35);border-radius:9px;padding:8px 12px;margin-bottom:8px">⚠️ Rules the engine can't test (drawn-by-eye lines etc.): <b>${esc(untestable.join(", "))}</b> — they don't block the backtest but won't generate signals. Use the Edit button to turn them into testable rules.</div>` : ""}
     <div class="bt-kpis">
       ${kpis.map((k) => `<div class="kpi"><div class="k-label">${k.l}</div><div class="k-value ${k.v.startsWith("-") && k.l.includes("draw") ? "down" : k.v.startsWith("+") || k.l === "Win rate" || k.l === "Profit factor" ? "up" : "flat"}">${k.v}</div></div>`).join("")}

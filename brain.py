@@ -173,6 +173,87 @@ def brain_preset():
     return jsonify({"ok": True, "brain": PRESET_STRATEGY})
 
 
+VALID_METRICS = {"close","open","high","low","rsi","sma","ema","atr","momentum_pct","body_pct",
+                "trend","candle","breakout_high","breakout_low","swing_high_break","swing_low_break",
+                "pullback_pct","pullback_low_pct","above_swing_high","below_swing_low","position_in_range",
+                "htf_trend","trendline_break_up","trendline_break_down","price_vs_trendline","trendline_touches"}
+STATE_METRICS = {"trend", "htf_trend", "candle"}
+DEFAULTS = {"breakout_high": 24, "breakout_low": 24, "swing_high_break": 3, "swing_low_break": 3,
+            "pullback_pct": 0.3, "pullback_low_pct": 0.3, "trendline_break_up": 2, "trendline_break_down": 2,
+            "trendline_touches": 2, "above_swing_high": 1, "below_swing_low": 1}
+
+
+def _infer_trend_op(note):
+    n = (note or "").lower()
+    if any(k in n for k in ("up", "bullish", "rise", "long", "above")):
+        return "up"
+    if any(k in n for k in ("down", "bearish", "fall", "short", "below")):
+        return "down"
+    return None
+
+
+def repair_rules(rules):
+    """Normalize a strategy's rules so malformed AI output can never zero-out a backtest."""
+    changes = []
+    for key in ("entry_conditions", "filters"):
+        conds = rules.get(key) or []
+        fixed = []
+        for c in conds:
+            if not isinstance(c, dict):
+                changes.append(f"removed malformed rule ({key})")
+                continue
+            m = c.get("metric")
+            if m not in VALID_METRICS:
+                changes.append(f"removed unknown rule '{m}'")
+                continue
+            c = dict(c)
+            op = c.get("op")
+            if m in STATE_METRICS:
+                if op not in ("up", "down", "flat"):
+                    inf = _infer_trend_op(c.get("note"))
+                    if inf:
+                        changes.append(f"{m}: op '{op}' -> '{inf}' (from note)")
+                        c["op"] = inf
+                    else:
+                        changes.append(f"{m}: invalid op '{op}' -> 'up'")
+                        c["op"] = "up"
+            elif op not in ("<", "<=", ">", ">=", "=="):
+                changes.append(f"{m}: invalid op '{op}' -> '>'")
+                c["op"] = ">"
+            if m in DEFAULTS and c.get("value") in (None, ""):
+                changes.append(f"{m}: missing value -> {DEFAULTS[m]}")
+                c["value"] = DEFAULTS[m]
+            fixed.append(c)
+        rules[key] = fixed
+    if rules.get("direction") not in ("long", "short", "both"):
+        changes.append(f"direction '{rules.get('direction')}' -> 'both'")
+        rules["direction"] = "both"
+    if rules.get("timeframe") not in ("1h", "4h", "1d"):
+        changes.append(f"timeframe '{rules.get('timeframe')}' -> '4h'")
+        rules["timeframe"] = "4h"
+    ex = rules.setdefault("exit", {})
+    if not any(ex.get(k) for k in ("sl_pct", "atr_sl_mult", "tp_pct", "atr_tp_mult", "trail_pct", "max_hold_bars")):
+        ex["sl_pct"] = 1.5
+        ex["trail_pct"] = 1.5
+        changes.append("empty exit plan -> SL 1.5% + trail 1.5%")
+    return rules, changes
+
+
+@bp.route("/api/strategy/brain/repair", methods=["POST"])
+def brain_repair():
+    existing = get_brain()
+    if not existing or not existing.get("rules"):
+        return jsonify({"ok": False, "error": "No strategy to repair — load or teach one first"}), 400
+    rules = dict(existing["rules"])
+    rules, changes = repair_rules(rules)
+    existing["rules"] = rules
+    if changes:
+        notes = existing["rules"].setdefault("notes", [])
+        notes.append("Auto-repaired: " + "; ".join(changes[:6]))
+        save_brain(existing)
+    return jsonify({"ok": True, "brain": existing, "changes": changes})
+
+
 @bp.route("/api/strategy/brain", methods=["DELETE"])
 def brain_delete():
     kv_set("strategyBrain", None)
@@ -433,6 +514,44 @@ def enrich(bars):
     return bars
 
 
+def _trend_match(op, t, cond, direction):
+    """Robust trend comparison.
+
+    - Normalizes invalid ops from the AI ("<" etc.) by inferring up/down from the note.
+    - A filter tagged for: "long"/"short" gates only that direction.
+    - An UNtagged trend filter is auto-directional: "up" gates longs only,
+      "down" gates shorts only. This makes the AI's paired filters
+      ("uptrend" + "downtrend") behave as complements instead of blocking all trades.
+    """
+    if op not in ("up", "down", "flat"):
+        note = str(cond.get("note", "")).lower()
+        if any(k in note for k in ("up", "bullish", "rise", "long")):
+            op = "up"
+        elif any(k in note for k in ("down", "bearish", "fall", "short")):
+            op = "down"
+        else:
+            return None  # cannot infer — surface as untestable, don't block everything
+    f = cond.get("for")
+    # a filter that doesn't apply to this direction is SKIPPED (True), never blocks
+    if f == "long":
+        return True if direction != "long" else t == op
+    if f == "short":
+        return True if direction != "short" else t == op
+    if direction == "long":
+        if op == "up":
+            return t == "up"
+        if op == "down":
+            return True  # a "down" filter doesn't gate longs
+        return t == op
+    if direction == "short":
+        if op == "down":
+            return t == "down"
+        if op == "up":
+            return True  # an "up" filter doesn't gate shorts
+        return t == op
+    return t == op
+
+
 def cond_holds(cond, b, direction=None):
     """direction: 'long'|'short'|None — enables per-direction filter logic."""
     m = cond.get("metric", "close")
@@ -442,9 +561,7 @@ def cond_holds(cond, b, direction=None):
         return True  # condition is for the other direction — skip it
     if m == "htf_trend":
         t = b.get("htf_trend", "flat")
-        if direction == "short" and not cond.get("for"):
-            op = "down" if op == "up" else ("up" if op == "down" else op)
-        return t == op
+        return _trend_match(op, t, cond, direction)
     if m == "trendline_break_up":
         # close crosses ABOVE the downtrend line (fitted through swing highs)
         line = b.get("_tl_high"); prev_line = b.get("_tl_high_prev")
@@ -480,10 +597,7 @@ def cond_holds(cond, b, direction=None):
         return touches >= vv if op in (">", ">=") else touches < vv
     if m == "trend":
         t = "up" if (b.get("sma5") and b.get("sma20") and b["sma5"] > b["sma20"]) else ("down" if (b.get("sma5") and b.get("sma20") and b["sma5"] < b["sma20"]) else "flat")
-        if cond.get("for") == "short":
-            # filter means "trade shorts when the trend is DOWN"
-            op = "down" if op == "up" else ("up" if op == "down" else op)
-        return t == op
+        return _trend_match(op, t, cond, direction)
     if m == "candle":
         return ("up" if b["c"] >= b["o"] else "down") == op
     if m == "swing_high_break":
@@ -788,12 +902,14 @@ def backtest_route():
     except Exception:
         htf_trends = None
 
+    rules, rep_changes = repair_rules(dict(brain.get("rules", {})))
     if brain["rules"].get("heiken_ashi"):
         bars = heiken_ashi_transform(bars)
     bars = enrich(bars)
-    result = run_backtest(bars, brain["rules"], htf_trends=htf_trends)
+    result = run_backtest(bars, rules, htf_trends=htf_trends)
     return jsonify({"ok": True, "pair": pair, "timeframe": tf, "months": months,
-                    "bars": len(bars), "heikenAshi": bool(brain["rules"].get("heiken_ashi")), **result})
+                    "bars": len(bars), "heikenAshi": bool(rules.get("heiken_ashi")),
+                    "repaired": rep_changes, **result})
 
 
 @bp.route("/api/strategy/report", methods=["POST"])

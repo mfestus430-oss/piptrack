@@ -24,8 +24,9 @@ TEACH_PROMPT = """You are a professional trading strategist. The trader explains
 Strategy explanation:
 {user_text}
 {video_block}
+{existing_block}
 
-SUPPORTED METRICS (computed from hourly/daily OHLC candles):
+SUPPORTED METRICS (computed from OHLC candles on the chosen timeframe):
 - close, open, high, low (price values)
 - sma(n) e.g. sma 20 ; ema(n) e.g. ema 50
 - rsi (14-period)
@@ -35,7 +36,31 @@ SUPPORTED METRICS (computed from hourly/daily OHLC candles):
 - trend — "up" | "down" | "flat" (sma5 vs sma20)
 - breakout_high(n) — close above the highest high of the previous n bars
 - breakout_low(n) — close below the lowest low of the previous n bars
+- swing_high_break — close above the last swing high (fractal high); op ">" value = fractal window (3)
+- swing_low_break — close below the last swing low (fractal low); op ">" value = fractal window (3)
+- pullback_pct — % pullback of the deepest low below the last swing high (for longs); value = minimum pullback % before a breakout counts
+- pullback_low_pct — % pullback of the highest high above the last swing low (for shorts); value = minimum pullback % before a breakdown counts
+- htf_trend — "up" | "down" | "flat" trend of the HIGHER timeframe (top-down analysis; daily when trading 1h/4h). Use op "up"/"down".
+- trendline_break_up — close crossed ABOVE the trendline fitted through the last 3 swing highs (downtrend line break); value = min touches (2)
+- trendline_break_down — close crossed BELOW the trendline fitted through the last 3 swing lows (uptrend line break); value = min touches (2)
+- price_vs_trendline — % distance of close from the fitted trendline; op ">" = above the line
+- trendline_touches — how many recent pivots the fitted trendline touches (strength of the line); value = min touches
+- above_swing_high / below_swing_low — state checks, use op "==" value 1
+
+DIRECTION-AWARE FILTERS: you may add "for": "long" or "for": "short" to any filter to apply
+it only to that direction. For trend filters meant to align each side, emit TWO filters:
+one trend filter with "op":"up" and "for":"long", and one trend filter with "op":"down"
+and "for":"short". When direction is "both", the engine also auto-reverses a trend filter
+for the short side so longs need an uptrend and shorts need a downtrend.
 - position_in_range — 0..1 where price sits within the last 24 bars (0 = at the highs)
+
+TRENDLINE / SUPPORT-RESISTANCE STRATEGIES: trendlines and horizontal S/R drawn by eye cannot
+be computed from OHLC. Translate them as best you can with the metrics above:
+- "break of the trendline / resistance" -> breakout_high or swing_high_break (with a pullback_pct condition so a retracement happened first)
+- "bounce off support / trendline" -> breakout_low or swing_low_break
+- "trail the stop along the trendline" -> set exit.trail_pct
+- "no fixed take profit, let the trend run" -> leave tp_pct null, set exit.trail_pct and/or max_hold_bars
+- Heiken Ashi candles -> set "heiken_ashi": true at the root of the rules JSON (the engine then computes all metrics on Heiken Ashi values)
 
 OPS: < <= > >= ==  (for trend: "up"|"down"|"flat"; for breakout_high/breakout_low use op ">" or "<" with value = lookback n; for body direction use metric "candle" with op "up"|"down").
 
@@ -46,7 +71,8 @@ Return STRICT JSON (no markdown):
   "name": "short strategy name",
   "summary": "2-3 sentences in plain English describing the strategy",
   "direction": "long|short|both",
-  "timeframe": "1h|1d",
+  "timeframe": "1h|4h|1d",
+  "heiken_ashi": false,
   "entry_conditions": [{{"metric":"rsi","op":"<","value":30,"note":"oversold"}}],
   "filters": [{{"metric":"trend","op":"up","value":null,"note":"only with the trend"}}],
   "exit": {{"sl_pct": 0.5, "tp_pct": 1.0, "atr_sl_mult": null, "atr_tp_mult": null, "max_hold_bars": null, "trail_pct": null}},
@@ -89,6 +115,63 @@ def brain_get():
     return jsonify({"learned": bool(b), "brain": b})
 
 
+@bp.route("/api/strategy/brain/manual", methods=["POST"])
+def brain_manual():
+    body = request.get_json(force=True) or {}
+    rules = body.get("rules")
+    if not rules or not isinstance(rules, dict):
+        return jsonify({"ok": False, "error": "rules object required"}), 400
+    rules.setdefault("entry_conditions", [])
+    rules.setdefault("filters", [])
+    rules.setdefault("exit", {})
+    rules.setdefault("direction", "both")
+    rules.setdefault("timeframe", "4h")
+    existing = get_brain() or {}
+    log = list((existing.get("source") or {}).get("log", []))
+    log.append({"type": "manual", "label": "manual edit", "date": time.strftime("%Y-%m-%d")})
+    brain = {
+        "name": str(body.get("name") or rules.get("name") or "My strategy")[:80],
+        "summary": str(body.get("summary") or rules.get("summary") or "")[:600],
+        "rules": rules,
+        "source": {"manual": True, "log": log[-30:]},
+    }
+    save_brain(brain)
+    return jsonify({"ok": True, "brain": brain})
+
+
+PRESET_STRATEGY = {
+    "name": "Top-Down Trendline S/R (4H Heiken Ashi)",
+    "summary": "My strategy: top-down analysis first (daily trend sets the direction), then on 4H Heiken Ashi draw the trendline through swing points. Enter long when price breaks ABOVE the downtrend line after the line touched 2+ pivots and a pullback formed. Trail the stop along the trendline, no fixed TP. Mirrored for shorts.",
+    "rules": {
+        "name": "Top-Down Trendline S/R (4H Heiken Ashi)",
+        "summary": "Top-down daily trend + 4H Heiken Ashi trendline break",
+        "direction": "both", "timeframe": "4h", "heiken_ashi": True,
+        "entry_conditions": [
+            {"metric": "trendline_break_up", "op": ">", "value": 2, "for": "long", "note": "Close crossed ABOVE the downtrend line (2+ touches)"},
+            {"metric": "pullback_pct", "op": ">", "value": 0.3, "for": "long", "note": "A pullback formed before the break"},
+            {"metric": "trendline_break_down", "op": ">", "value": 2, "for": "short", "note": "Close crossed BELOW the uptrend line (2+ touches)"},
+            {"metric": "pullback_low_pct", "op": ">", "value": 0.3, "for": "short", "note": "A pullback up formed before the break"}
+        ],
+        "filters": [
+            {"metric": "htf_trend", "op": "up", "for": "long", "note": "Top-down: daily trend up for longs"},
+            {"metric": "htf_trend", "op": "down", "for": "short", "note": "Top-down: daily trend down for shorts"}
+        ],
+        "exit": {"sl_pct": 1.5, "tp_pct": None, "atr_sl_mult": None, "atr_tp_mult": None,
+                 "max_hold_bars": None, "trail_pct": 1.5},
+        "notes": ["Trendlines fitted through last 3 swing pivots, validated by touch count",
+                  "Top-down filter uses the daily trend (SMA5/SMA20)"]
+    },
+    "source": {"preset": True,
+               "log": [{"type": "preset", "label": "Loaded default: Top-Down Trendline S/R (4H Heiken Ashi)", "date": time.strftime("%Y-%m-%d")}]},
+}
+
+
+@bp.route("/api/strategy/brain/preset", methods=["POST"])
+def brain_preset():
+    save_brain(dict(PRESET_STRATEGY))
+    return jsonify({"ok": True, "brain": PRESET_STRATEGY})
+
+
 @bp.route("/api/strategy/brain", methods=["DELETE"])
 def brain_delete():
     kv_set("strategyBrain", None)
@@ -103,8 +186,16 @@ def brain_teach():
     images = body.get("images") or []  # [{mime_type, data(base64)}]
     if isinstance(images, list):
         images = [im for im in images if isinstance(im, dict) and im.get("data")][:6]
-    if not user_text and not yt_url and not images:
-        return jsonify({"ok": False, "error": "Explain your strategy, paste a YouTube link, or upload screenshots"}), 400
+    video = body.get("video")  # {mime_type, data(base64)} — mp4 of the strategy
+    has_video = bool(video and isinstance(video, dict) and video.get("data"))
+    if has_video:
+        v_mime = str(video.get("mime_type", "video/mp4"))
+        if not v_mime.startswith("video/"):
+            v_mime = "video/mp4"
+        if len(str(video["data"])) > 30_000_000:  # ~22 MB binary
+            return jsonify({"ok": False, "error": "Video is too large — keep it under ~20 MB (lower resolution or a shorter clip)."}), 400
+    if not user_text and not yt_url and not images and not has_video:
+        return jsonify({"ok": False, "error": "Explain your strategy, paste a YouTube link, upload screenshots, or upload a video"}), 400
 
     video_block = ""
     if yt_url:
@@ -119,16 +210,36 @@ def brain_teach():
         except Exception as e:
             video_block = "\n(Note: could not fetch the YouTube transcript — " + str(e)[:100] + ". Continue using only the written explanation.)"
 
-    prompt = TEACH_PROMPT.format(user_text=user_text or "(strategy taught from screenshots)", video_block=video_block)
+    if has_video:
+        video_block += ("\nThe trader also attached a video of their strategy (screen recording of "
+                        "charts/trades). WATCH it carefully and extract the rules shown or explained in it, "
+                        "combining with any text above. Note the timeframe, candle type, entry/exit and risk rules you see.")
+
+    # --- merge mode: the trader may be ADDING to a strategy we already know ---
+    existing = get_brain()
+    existing_block = ""
+    if existing and existing.get("rules"):
+        keep = {k: existing["rules"].get(k) for k in
+                ("name", "summary", "direction", "timeframe", "heiken_ashi",
+                 "entry_conditions", "filters", "exit", "notes")}
+        existing_block = ("The trader already has this strategy. Do NOT drop rules unless the new "
+                          "material clearly contradicts them. UPDATE and ENRICH it with anything new "
+                          "from the new material (new entries, filters, exits, risk rules, notes):\n"
+                          + json.dumps(keep) + "\n")
+
+    prompt = TEACH_PROMPT.format(user_text=user_text or ("(strategy taught from " + ("video" if has_video else "screenshots") + ")"),
+                                 video_block=video_block, existing_block=existing_block)
     parts = [{"text": prompt}]
     for im in images:
         mime = str(im.get("mime_type", "image/png"))
         if not mime.startswith("image/"):
             mime = "image/png"
         parts.append({"inline_data": {"mime_type": mime, "data": str(im.get("data", ""))}})
+    if has_video:
+        parts.append({"inline_data": {"mime_type": v_mime, "data": str(video["data"])}})
     try:
         if len(parts) > 1:
-            rules = gemini_call_parts(parts, max_tokens=4000)
+            rules = gemini_call_parts(parts, max_tokens=4000, timeout=240 if has_video else 60)
         else:
             rules = gemini_call(prompt, max_tokens=4000)
     except ValueError as e:
@@ -148,11 +259,25 @@ def brain_teach():
     rules.setdefault("timeframe", "1h")
     rules.setdefault("name", "My strategy")
 
+    log = list(((existing or {}).get("source") or {}).get("log", []))
+    now = time.strftime("%Y-%m-%d")
+    if user_text:
+        log.append({"type": "text", "label": user_text[:100], "date": now})
+    if yt_url:
+        log.append({"type": "youtube", "label": yt_url[:100], "date": now})
+    for _ in images:
+        log.append({"type": "screenshot", "label": f"screenshot ({len(images)})", "date": now})
+    if has_video:
+        log.append({"type": "video", "label": str(video.get("name") or "uploaded")[:80], "date": now})
+    log = log[-30:]
+
     brain = {
         "name": str(rules.get("name", "My strategy"))[:80],
         "summary": str(rules.get("summary", ""))[:600],
         "rules": rules,
-        "source": {"text": user_text[:2000], "youtube": yt_url or None, "screenshots": len(images)},
+        "source": {"text": user_text[:2000], "youtube": yt_url or None, "screenshots": len(images),
+                   "video": (str(video.get("name") or "uploaded")[:80]) if has_video else None,
+                   "log": log},
     }
     save_brain(brain)
     return jsonify({"ok": True, "brain": brain})
@@ -161,9 +286,34 @@ def brain_teach():
 # ================================================================ backtest
 
 def fetch_history(pair, interval="1h", months=3):
-    """Fetch historical OHLC from Yahoo Finance. Returns list of bar dicts."""
+    """Fetch historical OHLC from Yahoo Finance. Returns list of bar dicts.
+    4h bars are resampled from 1h data (Yahoo has no native 4h interval)."""
     from live import pair_to_symbol
     sym = pair_to_symbol(pair)
+    if interval == "4h":
+        months = min(months, 12)  # 4h needs lots of 1h data
+        raw = fetch_history(pair, "1h", months)
+        if len(raw) < 100:
+            return raw
+        bins = {}
+        for b in raw:
+            key = b["t"] - (b["t"] % 14400)  # 4h boundary
+            if key not in bins:
+                bins[key] = {"t": key, "o": b["o"], "h": b["h"], "l": b["l"], "c": b["c"], "n": 1}
+            else:
+                e = bins[key]
+                e["h"] = max(e["h"], b["h"]); e["l"] = min(e["l"], b["l"])
+                e["c"] = b["c"]; e["n"] += 1
+        bars = []
+        for key in sorted(bins):
+            e = bins[key]
+            if e["n"] < 3:
+                continue
+            bars.append({
+                "t": e["t"], "o": e["o"], "h": e["h"], "l": e["l"], "c": e["c"],
+                "date": time.strftime("%Y-%m-%d %H:%M", time.gmtime(e["t"])),
+            })
+        return bars
     rng_map = {1: "1mo", 3: "3mo", 6: "6mo", 12: "1y", 24: "2y"}
     if interval == "1h" and months > 6:
         months = 6
@@ -197,6 +347,22 @@ def ema_series(values, n):
     out[n - 1] = seed
     for i in range(n, len(values)):
         out[i] = values[i] * k + out[i - 1] * (1 - k)
+    return out
+
+
+def heiken_ashi_transform(bars):
+    """Convert OHLC bars to Heiken Ashi values (in place on copies)."""
+    out = []
+    prev = None
+    for b in bars:
+        ha_c = (b["o"] + b["h"] + b["l"] + b["c"]) / 4
+        ha_o = (prev["o"] + prev["c"]) / 2 if prev else (b["o"] + b["c"]) / 2
+        ha_h = max(b["h"], ha_o, ha_c)
+        ha_l = min(b["l"], ha_o, ha_c)
+        nb = dict(b)
+        nb.update(o=ha_o, h=ha_h, l=ha_l, c=ha_c)
+        out.append(nb)
+        prev = nb
     return out
 
 
@@ -257,15 +423,90 @@ def enrich(bars):
     return bars
 
 
-def cond_holds(cond, b):
+def cond_holds(cond, b, direction=None):
+    """direction: 'long'|'short'|None — enables per-direction filter logic."""
     m = cond.get("metric", "close")
     op = cond.get("op", ">")
     v = cond.get("value")
+    if direction is not None and cond.get("for") and cond.get("for") != direction:
+        return True  # condition is for the other direction — skip it
+    if m == "htf_trend":
+        t = b.get("htf_trend", "flat")
+        if direction == "short" and not cond.get("for"):
+            op = "down" if op == "up" else ("up" if op == "down" else op)
+        return t == op
+    if m == "trendline_break_up":
+        # close crosses ABOVE the downtrend line (fitted through swing highs)
+        line = b.get("_tl_high"); prev_line = b.get("_tl_high_prev")
+        prev = b.get("_prev_close")
+        touches = b.get("_tl_high_touches", 0)
+        need = int(v) if v not in (None, "") else 2
+        if line is None or prev_line is None or prev is None:
+            return None
+        crossed = b["c"] > line and prev <= prev_line
+        return bool(crossed and touches >= need)
+    if m == "trendline_break_down":
+        line = b.get("_tl_low"); prev_line = b.get("_tl_low_prev")
+        prev = b.get("_prev_close")
+        touches = b.get("_tl_low_touches", 0)
+        need = int(v) if v not in (None, "") else 2
+        if line is None or prev_line is None or prev is None:
+            return None
+        crossed = b["c"] < line and prev >= prev_line
+        return bool(crossed and touches >= need)
+    if m == "price_vs_trendline":
+        line = b.get("_tl_low") if (b.get("htf_trend") or b.get("sma5", 0) >= b.get("sma20", 1)) else b.get("_tl_high")
+        if not line:
+            return None
+        pct = (b["c"] - line) / max(line, 1e-9) * 100
+        vv = float(v) if v not in (None, "") else 0
+        return pct > vv if op in (">", ">=") else pct < vv
+    if m == "trendline_touches":
+        line = b.get("_tl_low") if (b.get("htf_trend") or b.get("sma5", 0) >= b.get("sma20", 1)) else b.get("_tl_high")
+        if line is None:
+            return None
+        touches = b.get("_tl_low_touches", 0) if line == b.get("_tl_low") else b.get("_tl_high_touches", 0)
+        vv = int(v) if v not in (None, "") else 2
+        return touches >= vv if op in (">", ">=") else touches < vv
     if m == "trend":
         t = "up" if (b.get("sma5") and b.get("sma20") and b["sma5"] > b["sma20"]) else ("down" if (b.get("sma5") and b.get("sma20") and b["sma5"] < b["sma20"]) else "flat")
+        if cond.get("for") == "short":
+            # filter means "trade shorts when the trend is DOWN"
+            op = "down" if op == "up" else ("up" if op == "down" else op)
         return t == op
     if m == "candle":
         return ("up" if b["c"] >= b["o"] else "down") == op
+    if m == "swing_high_break":
+        sh = b.get("_sw_high")
+        return bool(sh and b["c"] > sh)
+    if m == "swing_low_break":
+        sl = b.get("_sw_low")
+        return bool(sl and b["c"] < sl)
+    if m == "pullback_pct":
+        sh = b.get("_sw_high")
+        pull_low = b.get("_sw_high_low")
+        if not sh or pull_low is None:
+            return None
+        # pullback = deepest low since the swing high (stays valid after breakout)
+        val = (sh - pull_low) / sh * 100
+        vv = float(v) if v not in (None, "") else 0
+        return val > vv if op in (">", ">=") else val < vv
+    if m == "pullback_low_pct":
+        sl = b.get("_sw_low")
+        pull_high = b.get("_sw_low_high")
+        if not sl or pull_high is None:
+            return None
+        val = (pull_high - sl) / sl * 100
+        vv = float(v) if v not in (None, "") else 0
+        return val > vv if op in (">", ">=") else val < vv
+    if m == "above_swing_high":
+        sh = b.get("_sw_high")
+        want = 1 if (v is None or float(v or 0) == 1) else 0
+        return (1 if (sh and b["c"] > sh) else 0) == want
+    if m == "below_swing_low":
+        sl = b.get("_sw_low")
+        want = 1 if (v is None or float(v or 0) == 1) else 0
+        return (1 if (sl and b["c"] < sl) else 0) == want
     if m == "breakout_high":
         lb = int(v or 24)
         i = b["_i"]
@@ -282,7 +523,7 @@ def cond_holds(cond, b):
            "sma": "sma20", "ema": "ema20", "atr": "atr", "momentum_pct": "mom8",
            "body_pct": "body_pct", "position_in_range": "pos24"}.get(m)
     if num is None:
-        return False
+        return None  # untestable rule — surfaced to the user, does not block other rules
     val = b.get(num)
     if val is None:
         return False
@@ -303,7 +544,36 @@ def cond_holds(cond, b):
     return False
 
 
-def run_backtest(bars, rules, spread_pct=0.02):
+def _fit_line(pts, i):
+    """Least-squares line through pivot points [(i, price)...] evaluated at bar i."""
+    if not pts:
+        return None
+    n = len(pts)
+    if n == 1:
+        return pts[0][1]
+    sx = sum(p[0] for p in pts); sy = sum(p[1] for p in pts)
+    sxy = sum(p[0] * p[1] for p in pts); sxx = sum(p[0] * p[0] for p in pts)
+    denom = n * sxx - sx * sx
+    if abs(denom) < 1e-9:
+        return sy / n
+    slope = (n * sxy - sx * sy) / denom
+    inter = (sy - slope * sx) / n
+    return inter + slope * i
+
+
+def _line_touches(pts, line_val, price, tol=0.002):
+    """How many of the last pivots lie within tol (0.2%) of the line value at their index."""
+    if not line_val:
+        return 0
+    n = 0
+    for (pi, pp) in pts:
+        lv = _fit_line([(x[0], x[1]) for x in pts if x[0] <= pi], pi)
+        if lv and abs(pp - lv) / max(pp, 1e-9) <= tol:
+            n += 1
+    return n
+
+
+def run_backtest(bars, rules, spread_pct=0.02, htf_trends=None):
     rules = rules or {}
     entry = [c for c in (rules.get("entry_conditions") or []) if isinstance(c, dict)]
     filters = [c for c in (rules.get("filters") or []) if isinstance(c, dict)]
@@ -312,10 +582,60 @@ def run_backtest(bars, rules, spread_pct=0.02):
 
     highs = [b["h"] for b in bars]
     lows = [b["l"] for b in bars]
+    untestable = set()
+    last_sh = last_sl = None
+    last_sh_low = None
+    last_sl_high = None
+    sh_pts = []   # [(i, price)] swing high pivots (for downtrend line)
+    sl_pts = []   # [(i, price)] swing low pivots (for uptrend line)
+    prev_close = None
     for i, b in enumerate(bars):
         b["_i"] = i
         b["_hi"] = highs
         b["_lo"] = lows
+        # fractal swing highs/lows (window 1)
+        if 1 <= i < len(bars) - 1:
+            if b["h"] >= bars[i - 1]["h"] and b["h"] >= bars[i + 1]["h"]:
+                last_sh = b["h"]
+                last_sh_low = b["l"]
+                sh_pts.append((i, b["h"]))
+                sh_pts = sh_pts[-6:]
+            if b["l"] <= bars[i - 1]["l"] and b["l"] <= bars[i + 1]["l"]:
+                last_sl = b["l"]
+                last_sl_high = b["h"]
+                sl_pts.append((i, b["l"]))
+                sl_pts = sl_pts[-6:]
+        if last_sh is not None and last_sh_low is not None:
+            last_sh_low = min(last_sh_low, b["l"])
+        if last_sl is not None and last_sl_high is not None:
+            last_sl_high = max(last_sl_high, b["h"])
+        b["_sw_high"] = last_sh
+        b["_sw_high_low"] = last_sh_low
+        b["_sw_low"] = last_sl
+        b["_sw_low_high"] = last_sl_high
+        # fitted trendlines through the last 3 pivots
+        b["_tl_high"] = _fit_line(sh_pts[-3:], i)   # downtrend resistance line
+        b["_tl_low"] = _fit_line(sl_pts[-3:], i)    # uptrend support line
+        b["_tl_high_prev"] = _fit_line(sh_pts[-3:], i - 1)
+        b["_tl_low_prev"] = _fit_line(sl_pts[-3:], i - 1)
+        b["_tl_high_touches"] = _line_touches(sh_pts[-3:], b["_tl_high"], b["c"])
+        b["_tl_low_touches"] = _line_touches(sl_pts[-3:], b["_tl_low"], b["c"])
+        b["_prev_close"] = prev_close
+        # top-down: higher-timeframe trend state
+        if htf_trends:
+            b["htf_trend"] = htf_trends.get(i, "flat")
+        prev_close = b["c"]
+
+    def conds_ok(conds, b, direction=None):
+        nonlocal untestable
+        ok = True
+        for c in conds:
+            r = cond_holds(c, b, direction)
+            if r is None:
+                untestable.add(str(c.get("metric", "?")))
+                continue
+            ok = ok and r
+        return ok
 
     warmup = 60
     start_equity = 10000.0
@@ -385,8 +705,7 @@ def run_backtest(bars, rules, spread_pct=0.02):
 
         dirs = ["long"] if direction == "long" else ["short"] if direction == "short" else ["long", "short"]
         for d in dirs:
-            ok = all(cond_holds(c, b) for c in entry + filters)
-            if ok:
+            if conds_ok(entry, b, d) and conds_ok(filters, b, d):
                 pos = open_pos(i, b, d)
                 break
 
@@ -417,7 +736,7 @@ def run_backtest(bars, rules, spread_pct=0.02):
     verdict = "✅ Promising edge" if n >= 15 and stats["profitFactor"] >= 1.2 and stats["winRate"] >= 40 else (
         "⚠️ Needs work" if n >= 8 else "📊 Not enough trades")
     stats["verdict"] = verdict
-    return {"trades": trades, "stats": stats, "equity": curve}
+    return {"trades": trades, "stats": stats, "equity": curve, "untestable": sorted(untestable)}
 
 
 @bp.route("/api/strategy/backtest", methods=["POST"])
@@ -427,18 +746,44 @@ def backtest_route():
     if not brain or not brain.get("rules"):
         return jsonify({"ok": False, "error": "Teach your strategy first (Brain tab)"}), 400
     pair = str(body.get("pair", "EUR/USD")).strip().upper()
-    tf = "1d" if body.get("timeframe") == "1d" else "1h"
+    tf = body.get("timeframe")
+    tf = tf if tf in ("1h", "4h", "1d") else "1h"
     months = min(24, max(1, int(body.get("months", 3) or 3)))
+    if tf == "4h":
+        months = min(months, 12)
     try:
         bars = fetch_history(pair, tf, months)
     except Exception as e:
         return jsonify({"ok": False, "error": f"Could not fetch {pair} history: {str(e)[:120]}"}), 502
     if len(bars) < 80:
         return jsonify({"ok": False, "error": f"Not enough historical data for {pair} ({len(bars)} bars)"}), 400
+
+    # top-down analysis: higher-timeframe trend state for every lower bar
+    htf_trends = None
+    try:
+        htf_tf = "1d" if tf in ("1h", "4h") else "1w"
+        htf_bars = fetch_history(pair, htf_tf, min(months, 24))
+        htf_bars = enrich(htf_bars)
+        states = []
+        for hb in htf_bars:
+            t = "up" if (hb.get("sma5") and hb.get("sma20") and hb["sma5"] > hb["sma20"]) else (
+                "down" if (hb.get("sma5") and hb.get("sma20") and hb["sma5"] < hb["sma20"]) else "flat")
+            states.append((hb["t"], t))
+        idx = 0
+        htf_trends = {}
+        for i, b in enumerate(bars):
+            while idx < len(states) - 1 and states[idx + 1][0] <= b["t"]:
+                idx += 1
+            htf_trends[i] = states[idx][1] if states else "flat"
+    except Exception:
+        htf_trends = None
+
+    if brain["rules"].get("heiken_ashi"):
+        bars = heiken_ashi_transform(bars)
     bars = enrich(bars)
-    result = run_backtest(bars, brain["rules"])
+    result = run_backtest(bars, brain["rules"], htf_trends=htf_trends)
     return jsonify({"ok": True, "pair": pair, "timeframe": tf, "months": months,
-                    "bars": len(bars), **result})
+                    "bars": len(bars), "heikenAshi": bool(brain["rules"].get("heiken_ashi")), **result})
 
 
 @bp.route("/api/strategy/report", methods=["POST"])

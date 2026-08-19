@@ -388,10 +388,13 @@
         <div class="grid2">
           <div class="card">
             <div class="card-head">
-              <h3>🧠 Teach your strategy</h3>
+              <h3 id="teachTitle">🧠 Teach your strategy</h3>
               <span class="chip" id="brainStatusChip">not learned</span>
             </div>
-            <p class="hint" style="margin-top:0">Explain your strategy in your own words — or paste a YouTube video of it. The AI extracts your actual rules (entries, filters, exits) and stores them as your <b>Strategy Brain</b>, used by the Coach, Live monitor and backtest.</p>
+            <p class="hint" id="teachHint" style="margin-top:0">Explain your strategy in your own words — or paste a YouTube video of it. The AI extracts your actual rules (entries, filters, exits) and stores them as your <b>Strategy Brain</b>, used by the Coach, Live monitor and backtest.</p>
+            <div class="card-foot" style="justify-content:flex-start;padding-top:6px">
+              <button class="btn primary" id="btnPreset">⚡ Load my strategy (one click — it already knows it)</button>
+            </div>
             <div class="form-grid">
               <label class="field full">
                 <span>Explain your strategy (entries, filters, exits, risk)</span>
@@ -405,6 +408,11 @@
                 <span>…or teach with screenshots of your setups (up to 6 — mix text + screenshots freely)</span>
                 <input type="file" class="input" id="bImgs" accept="image/*" multiple>
                 <div class="img-previews" id="bImgPreviews"></div>
+              </label>
+              <label class="field full">
+                <span>…or upload a strategy video (mp4 — up to ~20 MB, Gemini watches it)</span>
+                <input type="file" class="input" id="bVideo" accept="video/*">
+                <div class="img-previews" id="bVideoInfo"></div>
               </label>
             </div>
             <div class="card-foot" style="justify-content:space-between">
@@ -436,6 +444,7 @@
             <label class="field"><span>Timeframe</span>
               <select class="input" id="btTf">
                 <option value="1h">1 hour</option>
+                <option value="4h">4 hours</option>
                 <option value="1d">1 day</option>
               </select>
             </label>

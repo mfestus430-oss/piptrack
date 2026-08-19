@@ -7,7 +7,7 @@ const INSTRUMENTS = {
   "EUR/GBP": 0.0001, "EUR/JPY": 0.01, "GBP/JPY": 0.01, "AUD/JPY": 0.01,
   "EUR/CHF": 0.0001, "EUR/AUD": 0.0001, "EUR/NZD": 0.0001, "GBP/AUD": 0.0001,
   "GBP/CAD": 0.0001, "CAD/JPY": 0.01, "CHF/JPY": 0.01, "AUD/CAD": 0.0001,
-  "NZD/JPY": 0.01, "GBP/NZD": 0.0001, "CAD/CHF": 0.0001,
+  "NZD/JPY": 0.01, "GBP/NZD": 0.0001, "CAD/CHF": 0.0001, "AUD/NZD": 0.0001,
   "XAU/USD": 0.1, "XAG/USD": 0.01,
 };
 
@@ -1299,7 +1299,7 @@ function renderCoach() {
   }
 
   /* --- analyze defaults: pair / direction / session / risk --- */
-  const faves = ["EUR/USD", "GBP/USD", "USD/JPY", "XAU/USD"];
+  const faves = ["EUR/USD", "GBP/USD", "USD/JPY", "XAU/USD", "AUD/NZD"];
   const known = [...new Set([...Object.keys(INSTRUMENTS), ...state.trades.map((t) => t.pair)])];
   const ordered = [...new Set([...faves, ...known])];
   const pairSel = $("#sigPair");
@@ -1927,8 +1927,22 @@ function renderBrain() {
   chip.textContent = b ? "✅ learned · " + (b.name || "") : "not learned";
   chip.className = "chip " + (b ? "green" : "neutral");
 
+  /* teach card: merge mode labels when a strategy already exists */
+  const tTitle = $("#teachTitle"), tHint = $("#teachHint");
+  const btnPreset = $("#btnPreset");
+  if (btnPreset) btnPreset.classList.toggle("hidden", !!b);
+  if (b) {
+    if (tTitle) tTitle.textContent = "🧠 Add to what I already know";
+    if (tHint) tHint.innerHTML = "Your strategy <b>" + esc(b.name || "") + "</b> is loaded. Add a video, text or screenshots — the new material <b>merges into</b> the existing strategy instead of replacing it.";
+    const tbtn = $("#btnTeach");
+    if (tbtn) tbtn.innerHTML = "<span>Teach & update my strategy</span>";
+  } else {
+    if (tTitle) tTitle.textContent = "🧠 Teach your strategy";
+    if (tHint) tHint.innerHTML = "Explain your strategy in your own words — or paste a YouTube video of it. The AI extracts your actual rules (entries, filters, exits) and stores them as your <b>Strategy Brain</b>, used by the Coach, Live monitor and backtest.";
+  }
+
   /* backtest pair select */
-  const faves = ["EUR/USD", "GBP/USD", "USD/JPY", "XAU/USD"];
+  const faves = ["EUR/USD", "GBP/USD", "USD/JPY", "XAU/USD", "AUD/NZD"];
   const known = [...new Set([...Object.keys(INSTRUMENTS), ...state.trades.map((t) => t.pair)])];
   $("#btPair").innerHTML = [...new Set([...faves, ...known])].map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
 
@@ -1964,10 +1978,14 @@ function renderBrain() {
   $("#bLearned").innerHTML = `
     <div class="lb-name">${esc(b.name || "My strategy")}</div>
     ${b.summary ? `<div class="lb-summary">${esc(b.summary)}</div>` : ""}
-    <div class="lb-section">Direction / timeframe</div>
+    <div class="lb-section" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Direction / timeframe</span>
+      <button class="btn primary sm" id="btnEditBrain">✏️ Edit entry &amp; exit rules</button>
+    </div>
     <div class="cond-chips">
       <span class="cond-chip"><b>${esc((r.direction || "both").toUpperCase())}</b></span>
       <span class="cond-chip"><b>${esc(r.timeframe || "1h")}</b></span>
+      ${r.heiken_ashi ? `<span class="cond-chip"><b>Heiken Ashi</b></span>` : ""}
     </div>
     <div class="lb-section">Entry conditions</div>
     <div class="cond-chips">${conds.length ? conds.join("") : '<span class="cond-chip">none specified</span>'}</div>
@@ -1975,10 +1993,18 @@ function renderBrain() {
     <div class="lb-section">Exit plan</div>
     <div class="cond-chips">${exitChips.map((c) => `<span class="cond-chip"><b>${esc(c)}</b></span>`).join("")}</div>
     ${(r.notes || []).length ? `<div class="lb-note">${r.notes.map((n) => "• " + esc(n)).join("<br>")}</div>` : ""}
-    <div class="lb-note" style="margin-top:6px">Learned ${esc((b.updatedAt || "").slice(0, 10))}. Used by Coach screenshots, Live monitor and backtests.</div>`;
+    <div class="lb-section" style="margin-top:8px">Taught from</div>
+    <div class="cond-chips">
+      ${((b.source && b.source.log) || [{type:"preset", label:"loaded" }]).map((s) =>
+        `<span class="cond-chip">${esc(s.type)} — ${esc(s.label)}</span>`).join("")}
+    </div>
+    <div class="lb-note" style="margin-top:6px">Add more videos, text or screenshots above — it merges into this strategy.</div>`;
+  const editBtn = $("#btnEditBrain");
+  if (editBtn) editBtn.addEventListener("click", openBrainEditor);
 }
 
 let teachImgs = []; /* [{mime_type, data}] after client-side resize */
+let teachVideo = null; /* {mime_type, data, name, sizeMB} */
 
 function fileToResizedDataURL(file, maxDim) {
   return new Promise((resolve, reject) => {
@@ -2011,15 +2037,27 @@ function renderImgPreviews() {
   }));
 }
 
+function renderVideoInfo() {
+  const wrap = $("#bVideoInfo");
+  if (!teachVideo) { wrap.innerHTML = ""; return; }
+  wrap.innerHTML = `
+    <div class="ip-thumb" style="width:auto;padding:6px 12px;height:auto;display:flex;align-items:center;gap:8px">
+      🎬 <b>${esc(teachVideo.name)}</b> (${teachVideo.sizeMB} MB)
+      <button class="ip-x" style="position:static" id="bvClear">✕</button>
+    </div>`;
+  const clr = $("#bvClear");
+  if (clr) clr.addEventListener("click", () => { teachVideo = null; renderVideoInfo(); });
+}
+
 async function teachStrategy() {
   const text = $("#bText").value.trim();
   const yt = $("#bYt").value.trim();
-  if (!text && !yt && !teachImgs.length) { toast("Explain your strategy, paste a link, or upload screenshots", "err"); return; }
+  if (!text && !yt && !teachImgs.length && !teachVideo) { toast("Explain your strategy, paste a link, upload screenshots, or add a video", "err"); return; }
   const btn = $("#btnTeach");
   btn.disabled = true;
-  btn.innerHTML = "<span>Reading & learning… (can take ~30s)</span>";
+  btn.innerHTML = "<span>" + (teachVideo ? "Sending video to Gemini… (can take a minute)" : "Reading & learning… (can take ~30s)") + "</span>";
   try {
-    const res = await postJSON("/api/strategy/brain", { text, youtube_url: yt, images: teachImgs });
+    const res = await postJSON("/api/strategy/brain", { text, youtube_url: yt, images: teachImgs, video: teachVideo });
     if (!res.ok) throw new Error(res.error || "Teach failed");
     state.brain = res.brain;
     renderBrain();
@@ -2080,8 +2118,10 @@ function renderBacktestResult(res) {
       <td><span class="badge ${t.pnl_pct > 0 ? "win" : t.pnl_pct < 0 ? "loss" : "be"}">${esc(t.reason || "")}</span></td>
     </tr>`).join("");
 
+  const untestable = res.untestable || [];
   $("#btResult").innerHTML = `
-    <div class="bt-verdict ${cls}">${esc(s.verdict)} — ${esc(res.pair)} · ${res.timeframe} · ${res.months}mo · ${res.bars} bars tested</div>
+    <div class="bt-verdict ${cls}">${esc(s.verdict)} — ${esc(res.pair)} · ${res.timeframe} · ${res.months}mo · ${res.bars} bars tested${res.heikenAshi ? " · Heiken Ashi" : ""}</div>
+    ${untestable.length ? `<div class="hint" style="background:var(--red-soft);border:1px solid rgba(239,68,68,.35);border-radius:9px;padding:8px 12px;margin-bottom:8px">⚠️ Rules the engine can't test (drawn-by-eye lines etc.): <b>${esc(untestable.join(", "))}</b> — they don't block the backtest but won't generate signals. Use the Edit button to turn them into testable rules.</div>` : ""}
     <div class="bt-kpis">
       ${kpis.map((k) => `<div class="kpi"><div class="k-label">${k.l}</div><div class="k-value ${k.v.startsWith("-") && k.l.includes("draw") ? "down" : k.v.startsWith("+") || k.l === "Win rate" || k.l === "Profit factor" ? "up" : "flat"}">${k.v}</div></div>`).join("")}
     </div>
@@ -2141,9 +2181,201 @@ function renderReport(rp) {
     </div>`;
 }
 
+const BRAIN_METRICS = [
+  ["close", "Close price"], ["open", "Open price"], ["high", "High price"], ["low", "Low price"],
+  ["rsi", "RSI (14)"], ["sma", "SMA 20"], ["ema", "EMA 20"], ["atr", "ATR (14)"],
+  ["momentum_pct", "Momentum % (8 bars)"], ["body_pct", "Candle body %"], ["trend", "Trend (up/down/flat)"],
+  ["candle", "Candle color (up/down)"], ["breakout_high", "Break above n-bar high"],
+  ["breakout_low", "Break below n-bar low"], ["swing_high_break", "Close above last swing high"],
+  ["swing_low_break", "Close below last swing low"], ["pullback_pct", "Pullback % from swing high"],
+  ["pullback_low_pct", "Pullback % up from swing low"],
+  ["htf_trend", "Higher-TF trend (top-down)"],
+  ["trendline_break_up", "Break ABOVE downtrend line"], ["trendline_break_down", "Break BELOW uptrend line"],
+  ["price_vs_trendline", "Price vs trendline (%)"], ["trendline_touches", "Trendline touches"],
+  ["above_swing_high", "Price above swing high (1/0)"], ["below_swing_low", "Price below swing low (1/0)"],
+  ["position_in_range", "Position in range (0-1)"],
+];
+const BRAIN_OPS = ["<", "<=", ">", ">=", "=="];
+const BRAIN_METRIC_HINTS = {
+  trend: "op = up | down | flat", candle: "op = up | down",
+  swing_high_break: "op > , value = fractal window (3)",
+  swing_low_break: "op > , value = fractal window (3)",
+  breakout_high: "op > , value = lookback bars (24)", breakout_low: "op > , value = lookback bars (24)",
+  pullback_pct: "op > , value = min % pullback", pullback_low_pct: "op > , value = min % pullback",
+  htf_trend: "op = up | down | flat", trendline_break_up: "op > , value = min touches (2)",
+  trendline_break_down: "op > , value = min touches (2)", price_vs_trendline: "op >/< , value = %",
+  trendline_touches: "op >= , value = min touches",
+  above_swing_high: "op == , value 1", below_swing_low: "op == , value 1",
+};
+
+function brainCondRowHTML(c, prefix) {
+  const metrics = BRAIN_METRICS.map(([m, label]) =>
+    `<option value="${m}" ${c && c.metric === m ? "selected" : ""}>${label}</option>`).join("");
+  const ops = BRAIN_OPS.map((o) => `<option value="${o}" ${c && c.op === o ? "selected" : ""}>${o}</option>`).join("");
+  return `
+    <div class="brain-cond-row" data-prefix="${prefix}">
+      <select class="input bc-metric" style="flex:1.4">${metrics}</select>
+      <select class="input bc-op" style="width:70px">${ops}</select>
+      <input type="number" step="any" class="input bc-val" style="width:90px" value="${c && c.value != null ? c.value : ""}" placeholder="value">
+      <input type="text" class="input bc-note" style="flex:1.2" placeholder="note (optional)" value="${esc(c && c.note || "")}">
+      <button class="icon-btn del bc-del" title="Remove">✕</button>
+    </div>`;
+}
+
+function openBrainEditor() {
+  const b = state.brain;
+  if (!b) { toast("Teach a strategy first", "err"); return; }
+  const r = b.rules || {};
+  const ex = r.exit || {};
+  const box = $("#modalBox");
+  box.innerHTML = `
+  <div class="modal-head"><h2>✏️ Edit strategy — entry &amp; exit criteria</h2><button class="close-x" id="mClose">✕</button></div>
+  <div class="modal-body">
+    <div class="form-grid">
+      <label class="field"><span>Strategy name</span><input class="input" id="beName" value="${esc(b.name || "")}"></label>
+      <label class="field"><span>Direction</span>
+        <select class="input" id="beDir">
+          <option value="both" ${(r.direction || "both") === "both" ? "selected" : ""}>Both</option>
+          <option value="long" ${r.direction === "long" ? "selected" : ""}>Long only</option>
+          <option value="short" ${r.direction === "short" ? "selected" : ""}>Short only</option>
+        </select>
+      </label>
+      <label class="field"><span>Timeframe</span>
+        <select class="input" id="beTf">
+          <option value="1h" ${(r.timeframe || "4h") === "1h" ? "selected" : ""}>1 hour</option>
+          <option value="4h" ${(r.timeframe || "4h") === "4h" ? "selected" : ""}>4 hours</option>
+          <option value="1d" ${(r.timeframe || "4h") === "1d" ? "selected" : ""}>1 day</option>
+        </select>
+      </label>
+      <label class="field" style="justify-content:flex-end"><span>&nbsp;</span>
+        <label class="check-line"><input type="checkbox" id="beHa" ${r.heiken_ashi ? "checked" : ""}> <b>Use Heiken Ashi candles</b></label>
+      </label>
+      <label class="field full"><span>Summary</span>
+        <textarea class="input" id="beSummary" rows="2">${esc(b.summary || "")}</textarea>
+      </label>
+    </div>
+    <div class="lb-section" style="margin-top:14px">Entry conditions (all must hold)</div>
+    <div class="brain-conds" id="beEntry"></div>
+    <button class="btn ghost sm" id="beAddEntry">+ Add entry condition</button>
+    <div class="lb-section" style="margin-top:12px">Filters (all must hold)</div>
+    <div class="brain-conds" id="beFilters"></div>
+    <button class="btn ghost sm" id="beAddFilter">+ Add filter</button>
+    <div class="lb-section" style="margin-top:14px">Exit plan</div>
+    <div class="form-grid">
+      <label class="field"><span>Stop loss % (of entry)</span><input type="number" step="any" class="input" id="beSlPct" value="${ex.sl_pct != null ? ex.sl_pct : ""}"></label>
+      <label class="field"><span>Take profit % (empty = let trend run)</span><input type="number" step="any" class="input" id="beTpPct" value="${ex.tp_pct != null ? ex.tp_pct : ""}"></label>
+      <label class="field"><span>SL × ATR</span><input type="number" step="any" class="input" id="beAtrSl" value="${ex.atr_sl_mult != null ? ex.atr_sl_mult : ""}"></label>
+      <label class="field"><span>TP × ATR</span><input type="number" step="any" class="input" id="beAtrTp" value="${ex.atr_tp_mult != null ? ex.atr_tp_mult : ""}"></label>
+      <label class="field"><span>Trailing stop % (trend-following)</span><input type="number" step="any" class="input" id="beTrail" value="${ex.trail_pct != null ? ex.trail_pct : ""}"></label>
+      <label class="field"><span>Max hold (bars)</span><input type="number" step="1" class="input" id="beHold" value="${ex.max_hold_bars != null ? ex.max_hold_bars : ""}"></label>
+    </div>
+    <div class="lb-section" style="margin-top:12px">Notes / untestable rules</div>
+    <textarea class="input" id="beNotes" rows="2" style="width:100%">${esc((r.notes || []).join("\n"))}</textarea>
+  </div>
+  <div class="modal-foot">
+    <button class="btn ghost" id="mCancel">Cancel</button>
+    <button class="btn primary" id="beSave">Save strategy</button>
+  </div>`;
+
+  const entryWrap = $("#beEntry"), filterWrap = $("#beFilters");
+  (r.entry_conditions || []).forEach((c) => entryWrap.insertAdjacentHTML("beforeend", brainCondRowHTML(c, "entry")));
+  (r.filters || []).forEach((c) => filterWrap.insertAdjacentHTML("beforeend", brainCondRowHTML(c, "filter")));
+  if (!(r.entry_conditions || []).length) entryWrap.insertAdjacentHTML("beforeend", brainCondRowHTML(null, "entry"));
+  bindBrainRowEvents(entryWrap); bindBrainRowEvents(filterWrap);
+
+  $("#beAddEntry").addEventListener("click", () => {
+    entryWrap.insertAdjacentHTML("beforeend", brainCondRowHTML(null, "entry"));
+    bindBrainRowEvents(entryWrap);
+  });
+  $("#beAddFilter").addEventListener("click", () => {
+    filterWrap.insertAdjacentHTML("beforeend", brainCondRowHTML(null, "filter"));
+    bindBrainRowEvents(filterWrap);
+  });
+
+  showModal();
+  $("#mClose").addEventListener("click", hideModal);
+  $("#mCancel").addEventListener("click", hideModal);
+  $("#beSave").addEventListener("click", async () => {
+    const collect = (wrap) => Array.from(wrap.querySelectorAll(".brain-cond-row")).map((row) => {
+      const metric = row.querySelector(".bc-metric").value;
+      const op = row.querySelector(".bc-op").value;
+      const vRaw = row.querySelector(".bc-val").value;
+      const note = row.querySelector(".bc-note").value.trim();
+      const c = { metric, op };
+      if (vRaw !== "") c.value = Number(vRaw);
+      if (note) c.note = note;
+      return c;
+    }).filter((c) => c.metric);
+    const num = (id) => { const v = $(id).value; return v === "" || v == null ? null : Number(v); };
+    const rules = {
+      name: $("#beName").value.trim() || "My strategy",
+      summary: $("#beSummary").value.trim(),
+      direction: $("#beDir").value,
+      timeframe: $("#beTf").value,
+      heiken_ashi: $("#beHa").checked,
+      entry_conditions: collect(entryWrap),
+      filters: collect(filterWrap),
+      exit: {
+        sl_pct: num("#beSlPct"), tp_pct: num("#beTpPct"),
+        atr_sl_mult: num("#beAtrSl"), atr_tp_mult: num("#beAtrTp"),
+        trail_pct: num("#beTrail"), max_hold_bars: num("#beHold"),
+      },
+      notes: $("#beNotes").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    };
+    try {
+      const res = await postJSON("/api/strategy/brain/manual", { name: rules.name, summary: rules.summary, rules });
+      if (!res.ok) throw new Error(res.error || "Save failed");
+      state.brain = res.brain;
+      hideModal();
+      renderBrain();
+      toast("Strategy updated — run a backtest to check it");
+    } catch (err) {
+      toast("Save failed: " + err.message, "err");
+    }
+  });
+}
+
+function bindBrainRowEvents(wrap) {
+  wrap.querySelectorAll(".bc-metric").forEach((sel) => {
+    sel.addEventListener("change", () => {
+      const hint = BRAIN_METRIC_HINTS[sel.value];
+      const noteInput = sel.closest(".brain-cond-row").querySelector(".bc-note");
+      if (hint && !noteInput.dataset.touched) noteInput.placeholder = hint;
+    });
+  });
+  wrap.querySelectorAll(".bc-del").forEach((b) => b.addEventListener("click", () => {
+    b.closest(".brain-cond-row").remove();
+  }));
+}
+
 function bindBrainEvents() {
   $("#btnTeach").addEventListener("click", teachStrategy);
   $("#btnBacktest").addEventListener("click", runBacktest);
+  const bp = $("#btnPreset");
+  if (bp) bp.addEventListener("click", async () => {
+    try {
+      const res = await postJSON("/api/strategy/brain/preset", {});
+      if (!res.ok) throw new Error(res.error || "Failed");
+      state.brain = res.brain;
+      renderBrain();
+      toast("Your strategy is loaded — it already knows it ⚡");
+    } catch (err) { toast("Failed: " + err.message, "err"); }
+  });
+  $("#bVideo").addEventListener("change", (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    if (!f.type.startsWith("video/")) { toast("Please choose a video file", "err"); return; }
+    if (f.size > 22 * 1024 * 1024) { toast("Video too large — keep it under ~20 MB", "err"); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      teachVideo = { mime_type: f.type || "video/mp4", data: String(reader.result).split(",")[1], name: f.name, sizeMB: (f.size / 1048576).toFixed(1) };
+      renderVideoInfo();
+      toast("Video ready to teach with — Gemini will watch it");
+    };
+    reader.onerror = () => toast("Could not read that video", "err");
+    reader.readAsDataURL(f);
+  });
   $("#bImgs").addEventListener("change", async (e) => {
     const files = Array.from(e.target.files || []).slice(0, 6 - teachImgs.length);
     e.target.value = "";

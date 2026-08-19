@@ -19,6 +19,7 @@ from storage import get_db, query_db, exec_db, kv_get, kv_set
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
+app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # allow strategy video uploads (mp4 ~20MB base64)
 
 
 # ---------------------------------------------------------------- database

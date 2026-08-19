@@ -2361,21 +2361,72 @@ function bindBrainEvents() {
       toast("Your strategy is loaded — it already knows it ⚡");
     } catch (err) { toast("Failed: " + err.message, "err"); }
   });
-  $("#bVideo").addEventListener("change", (e) => {
+  $("#bVideo").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
     e.target.value = "";
     if (!f) return;
     if (!f.type.startsWith("video/")) { toast("Please choose a video file", "err"); return; }
-    if (f.size > 22 * 1024 * 1024) { toast("Video too large — keep it under ~20 MB", "err"); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      teachVideo = { mime_type: f.type || "video/mp4", data: String(reader.result).split(",")[1], name: f.name, sizeMB: (f.size / 1048576).toFixed(1) };
+    if (f.size > 200 * 1024 * 1024) { toast("Video too large — max 200 MB before compression", "err"); return; }
+    toast("Compressing video… (a few seconds)");
+    try {
+      const compressed = await compressVideo(f);
+      if (!compressed) throw new Error("compression failed");
+      teachVideo = { mime_type: "video/mp4", data: compressed.data, name: f.name, sizeMB: compressed.sizeMB };
       renderVideoInfo();
-      toast("Video ready to teach with — Gemini will watch it");
-    };
-    reader.onerror = () => toast("Could not read that video", "err");
-    reader.readAsDataURL(f);
+      toast("Video ready (" + compressed.sizeMB + " MB) — Gemini will watch it");
+    } catch (err) {
+      toast("Could not process that video: " + err.message, "err");
+    }
   });
+
+/* compress video in the browser to keep it under the upload limit (~15 MB) */
+async function compressVideo(file) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const cv = document.createElement("canvas");
+      const v = document.createElement("video");
+      v.muted = true; v.playsInline = true;
+      const url = URL.createObjectURL(file);
+      v.src = url;
+      await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = rej; setTimeout(() => rej(new Error("timeout")), 15000); });
+      const dur = v.duration || 60;
+      const maxDur = 120;
+      const step = dur > maxDur ? dur / maxDur : 1;
+      const scale = Math.min(1, 640 / Math.max(v.videoWidth, v.videoHeight || 1));
+      const w = Math.max(1, Math.round((v.videoWidth || 640) * scale));
+      const h = Math.max(1, Math.round((v.videoHeight || 360) * scale));
+      const mime = "video/mp4";
+      const chunks = [];
+      const rec = new MediaRecorder(cv.captureStream(30), { mimeType: mime, videoBitsPerSecond: 600000 });
+      rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = () => {
+        URL.revokeObjectURL(url);
+        const blob = new Blob(chunks, { type: mime });
+        const reader = new FileReader();
+        reader.onload = () => resolve({ data: String(reader.result).split(",")[1], sizeMB: (blob.size / 1048576).toFixed(1) });
+        reader.onerror = () => reject(new Error("read failed"));
+        reader.readAsDataURL(blob);
+      };
+      const ctx = cv.getContext("2d");
+      cv.width = w; cv.height = h;
+      let t = 0;
+      rec.start(500);
+      v.currentTime = t;
+      v.ontimeupdate = () => {
+        if (v.currentTime >= t + step - 0.05) {
+          ctx.drawImage(v, 0, 0, w, h);
+          t += step;
+          if (t >= Math.min(dur, maxDur)) { v.pause(); rec.stop(); }
+          else v.currentTime = Math.min(t, dur);
+        }
+      };
+      v.play().catch(() => {});
+      setTimeout(() => { if (rec.state !== "inactive") { try { rec.stop(); } catch (e) {} } }, (maxDur + 15) * 1000);
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
   $("#bImgs").addEventListener("change", async (e) => {
     const files = Array.from(e.target.files || []).slice(0, 6 - teachImgs.length);
     e.target.value = "";

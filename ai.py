@@ -138,9 +138,12 @@ def _mock_response(prompt):
 # ---------------------------------------------------------------- telegram
 
 def discord_config():
+    # Environment variable takes priority (Render setup), then in-app saved value.
+    env = os.environ.get("DISCORD_WEBHOOK", "").strip()
+    if env:
+        return {"webhook": env, "source": "env"}
     cfg = load_config()
-    url = os.environ.get("DISCORD_WEBHOOK") or cfg.get("discord_webhook", "")
-    return {"webhook": str(url).strip()}
+    return {"webhook": str(cfg.get("discord_webhook", "")).strip(), "source": "app"}
 
 
 def send_discord(text):
@@ -149,8 +152,12 @@ def send_discord(text):
     if not w["webhook"]:
         return False, "Discord webhook not configured"
     body = json.dumps({"content": text[:1900]}).encode()
-    req = urllib.request.Request(w["webhook"], data=body,
-                                 headers={"Content-Type": "application/json"})
+    # Discord/Cloudflare blocks bare "Python-urllib" signatures (error 1010) —
+    # send a browser-like User-Agent so the message is accepted.
+    req = urllib.request.Request(w["webhook"], data=body, headers={
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+    })
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
             r.read()
